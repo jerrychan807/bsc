@@ -3,6 +3,7 @@ package vm
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/ethereum/go-ethereum/core/vm/lightclient"
 	"github.com/ethereum/go-ethereum/params"
@@ -21,6 +22,7 @@ const (
 // consensus state length | consensus state | tendermint header |
 // 32 bytes               |                 |                   |
 func decodeTendermintHeaderValidationInput(input []byte) (*lightclient.ConsensusState, *lightclient.Header, error) {
+	log.Info("[*****] decodeTendermintHeaderValidationInput Func")
 	csLen := binary.BigEndian.Uint64(input[consensusStateLengthBytesLength-uint64TypeLength : consensusStateLengthBytesLength])
 	if uint64(len(input)) <= consensusStateLengthBytesLength+csLen {
 		return nil, nil, fmt.Errorf("expected payload size %d, actual size: %d", consensusStateLengthBytesLength+csLen, len(input))
@@ -52,30 +54,46 @@ func (c *tmHeaderValidate) Run(input []byte) (result []byte, err error) {
 		}
 	}()
 
+	//log.Info("[*****] tmHeaderValidate Run Func ")
+	fmt.Println("[*****] tmHeaderValidate Run Func ")
 	if uint64(len(input)) <= precompileContractInputMetaDataLength {
 		return nil, fmt.Errorf("invalid input")
 	}
+	//log.Info("[*****] Step 1")
+	fmt.Println("[*****] Step 1")
 
 	payloadLength := binary.BigEndian.Uint64(input[precompileContractInputMetaDataLength-uint64TypeLength : precompileContractInputMetaDataLength])
 	if uint64(len(input)) != payloadLength+precompileContractInputMetaDataLength {
 		return nil, fmt.Errorf("invalid input: input size should be %d, actual the size is %d", payloadLength+precompileContractInputMetaDataLength, len(input))
 	}
+	//log.Info("[*****] Step 2")
+	fmt.Println("[*****] Step 2")
 
 	cs, header, err := decodeTendermintHeaderValidationInput(input[precompileContractInputMetaDataLength:])
+	//log.Info("[*****]", "cs", cs)
+	fmt.Printf("[*****] cs: %v\n", cs)
+	//log.Info("[*****]", "header", header)
+	fmt.Printf("[*****] header: %v\n", header)
 	if err != nil {
 		return nil, err
 	}
 
 	validatorSetChanged, err := cs.ApplyHeader(header)
+	//log.Info("[*****]", "validatorSetChanged", validatorSetChanged)
+	fmt.Printf("[*****] validatorSetChanged: %v\n", validatorSetChanged)
 	if err != nil {
 		return nil, err
 	}
 
+	fmt.Println("[*****] go in EncodeConsensusState() func")
 	consensusStateBytes, err := cs.EncodeConsensusState()
+	fmt.Printf("[*****] consensusStateBytes: %v\n", consensusStateBytes)
 	if err != nil {
 		return nil, err
 	}
 
+	//log.Info("[*****] Step 3")
+	fmt.Println("[*****] Step 3")
 	// result
 	// | validatorSetChanged | empty      | consensusStateBytesLength |  new consensusState |
 	// | 1 byte              | 23 bytes   | 8 bytes                   |                     |
