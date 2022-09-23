@@ -90,9 +90,11 @@ func DecodeConsensusState(input []byte) (ConsensusState, error) {
 func (cs ConsensusState) EncodeConsensusState() ([]byte, error) {
 	validatorSetLength := uint64(len(cs.NextValidatorSet.Validators))
 	serializeLength := chainIDLength + heightLength + appHashLength + validatorSetHashLength + validatorSetLength*(validatorPubkeyLength+validatorVotingPowerLength)
+	fmt.Println("[*****] Step 2.0")
 	if serializeLength > maxConsensusStateLength {
 		return nil, fmt.Errorf("too many validators %d, consensus state bytes should not exceed %d", len(cs.NextValidatorSet.Validators), maxConsensusStateLength)
 	}
+	fmt.Println("[*****] Step 2.1")
 
 	encodingBytes := make([]byte, serializeLength)
 
@@ -100,6 +102,7 @@ func (cs ConsensusState) EncodeConsensusState() ([]byte, error) {
 	if uint64(len(cs.ChainID)) > chainIDLength {
 		return nil, fmt.Errorf("chainID length should be no more than 32")
 	}
+	fmt.Println("[*****] Step 2.2")
 	copy(encodingBytes[pos:pos+chainIDLength], cs.ChainID)
 	pos += chainIDLength
 
@@ -125,21 +128,25 @@ func (cs ConsensusState) EncodeConsensusState() ([]byte, error) {
 		binary.BigEndian.PutUint64(encodingBytes[pos:pos+validatorVotingPowerLength], uint64(validator.VotingPower))
 		pos += validatorVotingPowerLength
 	}
+	fmt.Println("[*****] Step 2.3")
 
 	return encodingBytes, nil
 }
 
+// 应该是验证头部
 func (cs *ConsensusState) ApplyHeader(header *Header) (bool, error) {
 	if uint64(header.Height) < cs.Height {
 		return false, fmt.Errorf("header height < consensus height (%d < %d)", header.Height, cs.Height)
 	}
-
+	fmt.Println("[*****] ApplyHeader 1")
 	if err := header.Validate(cs.ChainID); err != nil {
 		return false, err
 	}
-
+	fmt.Println("[*****] ApplyHeader 2")
 	trustedNextHash := cs.NextValidatorSet.Hash()
 	if cs.Height == uint64(header.Height-1) {
+		// 当前共识状态里的NextValidatorSetHash与头部的ValidatorsHash是否相等
+		// 可信活跃验证者集合是否相同
 		if !bytes.Equal(trustedNextHash, header.ValidatorsHash) {
 			return false, lerr.ErrUnexpectedValidators(header.ValidatorsHash, trustedNextHash)
 		}
@@ -148,6 +155,7 @@ func (cs *ConsensusState) ApplyHeader(header *Header) (bool, error) {
 			return false, err
 		}
 	} else {
+		fmt.Println("[*****] cs.NextValidatorSet.VerifyFutureCommit")
 		err := cs.NextValidatorSet.VerifyFutureCommit(header.ValidatorSet, cs.ChainID,
 			header.Commit.BlockID, header.Height, header.Commit)
 		if err != nil {
@@ -163,7 +171,7 @@ func (cs *ConsensusState) ApplyHeader(header *Header) (bool, error) {
 	cs.AppHash = header.AppHash
 	cs.CurValidatorSetHash = header.ValidatorsHash
 	cs.NextValidatorSet = header.NextValidatorSet
-
+	fmt.Println("[*****] ApplyHeader update consensus state")
 	return validatorSetChanged, nil
 }
 
